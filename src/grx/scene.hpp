@@ -6,8 +6,9 @@
 #include <map>
 #include <vector>
 
-#include <SFML/Graphics/Drawable.hpp>
 #include <SFML/Graphics/RenderTarget.hpp>
+
+#include "sfml_types.hpp"
 
 namespace grx {
 
@@ -30,47 +31,97 @@ public:
         Batch(Batch&&) = default;
         Batch& operator=(Batch&&) = default;
 
-        ~Batch() {
-            for (auto element : elements)
-                delete element;
-        }
-
         layer_t get_layer() const {
             return layer;
+        }
+
+        void set_elements(auto&& input_elements) {
+            elements.assign(input_elements.begin(), input_elements.end());
         }
 
         auto& get_elements() {
             return elements;
         }
 
+        const auto& get_elements() const {
+            return elements;
+        }
+
         template <typename T, typename... Args>
-        T* create_element(Args&&... args) {
-            auto object = new T(std::forward<Args>(args)...);
-            elements.push_back(object);
-            return object;
+        decltype(auto) create_element(Args&&... args) {
+            elements.push_back({});
+            return elements.back().emplace<T>(std::forward<Args>(args)...);
         }
 
     private:
         layer_t layer;
-        std::vector<sf::Drawable*> elements;
+        std::vector<Drawable> elements;
+        uint32_t users = 0;
+        bool delete_later = false;
     };
 
 
     using batch_storage_t = std::map<id_t, Batch>;
-    using batch_bucket_t = batch_storage_t::iterator;
 
 
     class ItemRef {
     public:
         friend Scene;
 
+        ItemRef() = default;
+
+        ItemRef(const ItemRef& item): scene(item.scene), cached(item.cached), id(item.id) {
+            if (auto p = get_pointer())
+                ++p->users;
+        }
+
+        ItemRef& operator=(const ItemRef& item) {
+            if (&item == this)
+                return *this;
+
+            if (auto p = get_pointer()) {
+                --p->users;
+                if (p->delete_later && p->users == 1)
+                    scene->delete_item(id);
+            }
+
+            scene = item.scene;
+            cached = item.cached;
+            id = item.id;
+
+            if (auto p = get_pointer())
+                ++p->users;
+
+            return *this;
+        }
+
+        ItemRef(ItemRef&& item) noexcept: scene(item.scene), cached(item.cached), id(item.id) {
+            item.cached = nullptr;
+        }
+
+        ItemRef& operator=(ItemRef&& item) noexcept {
+            if (&item == this)
+                return *this;
+
+            scene = item.scene;
+            cached = item.cached;
+            id = item.id;
+
+            item.cached = nullptr;
+
+            return *this;
+        }
+
         ~ItemRef() {
-            if (to_delete)
-                scene->delete_item(id);
+            if (auto p = get_pointer()) {
+                --p->users;
+                if (p->delete_later && p->users == 1)
+                    scene->delete_item(id);
+            }
         }
 
         void delete_later(bool value = true) {
-            to_delete = value;
+            get_pointer()->delete_later = value;
         }
 
         id_t get_id() const {
@@ -82,26 +133,28 @@ public:
         }
 
         layer_t get_layer() const {
-            return access_pointer()->get_layer();
+            return get_pointer()->get_layer();
+        }
+
+        Batch* get_pointer() {
+            if (!cached)
+                return cached = scene->get_batch_pointer(id);
+            return cached;
+        }
+
+        const Batch* get_pointer() const {
+            if (!cached)
+                return cached = scene->get_batch_pointer(id);
+            return cached;
         }
 
     protected:
-        ItemRef(Scene* iscene, batch_bucket_t ibucket, id_t iid): scene(iscene), cached_bucket(ibucket), id(iid) {}
-
-        Batch* access_pointer() const {
-            if (scene->is_empty_bucket(cached_bucket)) {
-                cached_bucket = scene->access_bucket(id);
-                if (scene->is_empty_bucket(cached_bucket))
-                    return nullptr;
-            }
-            return &cached_bucket->second;
-        }
+        ItemRef(Scene* iscene, Batch* batch, id_t iid): scene(iscene), cached(batch), id(iid) {}
 
     private:
-        Scene* scene;
-        mutable batch_bucket_t cached_bucket;
+        Scene* scene = nullptr;
+        mutable Batch* cached = nullptr;
         id_t id;
-        bool to_delete = false;
     };
 
 
@@ -109,16 +162,26 @@ public:
     public:
         friend Scene;
 
+        BatchRef(): ItemRef() {}
+
         Batch* operator->() {
-            return access_pointer();
+            return get_pointer();
+        }
+
+        const Batch* operator->() const {
+            return get_pointer();
         }
 
         Batch& operator*() {
-            return *access_pointer();
+            return *get_pointer();
+        }
+
+        const Batch& operator*() const {
+            return *get_pointer();
         }
 
     private:
-        BatchRef(Scene* scene, batch_bucket_t bucket, id_t id): ItemRef(scene, bucket, id) {}
+        BatchRef(Scene* scene, Batch* batch, id_t id): ItemRef(scene, batch, id) {}
     };
 
 
@@ -127,16 +190,26 @@ public:
     public:
         friend Scene;
 
+        ElementRef(): ItemRef() {}
+
         T* operator->() {
-            return static_cast<T*>(access_pointer()->get_elements().front());
+            return &operator*();
         }
 
-        Batch& operator*() {
-            return *operator->();
+        const T* operator->() const {
+            return &operator*();
+        }
+
+        T& operator*() {
+            return std::get<T>(get_pointer()->get_elements().front());
+        }
+
+        const T& operator*() const {
+            return std::get<T>(get_pointer()->get_elements().front());
         }
 
     private:
-        ElementRef(Scene* scene, batch_bucket_t bucket, id_t id): ItemRef(scene, bucket, id) {}
+        ElementRef(Scene* scene, Batch* batch, id_t id): ItemRef(scene, batch, id) {}
     };
 
 
@@ -145,7 +218,7 @@ public:
             for (auto&& [_, batch] : batches)
                 if (layer == batch.layer)
                     for (auto element : batch.elements)
-                        target.draw(*element, render_states);
+                        downcast(element, [&](const sf::Drawable& drawable) { target.draw(drawable, render_states); });
     }
 
     template <typename T, typename... Args>
@@ -165,7 +238,13 @@ public:
         auto id = next_id();
         auto [bucket, _] = batches.emplace(id, layer);
         ++layers_usage[layer];
-        return {this, bucket, id};
+        return {this, &bucket->second, id};
+    }
+
+    BatchRef create_batch(layer_t layer, auto&& drawables) {
+        auto batch = create_batch(layer);
+        batch->set_elements(drawables);
+        return batch;
     }
 
     bool delete_item(id_t id) {
@@ -183,17 +262,27 @@ public:
         return delete_item(item.get_id());
     }
 
+    size_t get_batches_count() const {
+        return batches.size();
+    }
+
+    size_t get_elements_count() const {
+        size_t result = 0;
+        for (auto&& batch : batches)
+            result += batch.second.elements.size();
+        return result;
+    }
+
 private:
     id_t next_id() {
         return id_counter++;
     }
 
-    batch_bucket_t access_bucket(id_t id) {
-        return batches.find(id);
-    }
-
-    bool is_empty_bucket(const batch_bucket_t& bucket) const {
-        return bucket == batches.end();
+    Batch* get_batch_pointer(id_t id) {
+        auto bucket = batches.find(id);
+        if (bucket != batches.end())
+            return &bucket->second;
+        return nullptr;
     }
 
 private:
