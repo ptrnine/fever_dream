@@ -19,6 +19,8 @@ struct ParticleState {
 
 class Particles {
 public:
+    friend class ParticlesInstance;
+
     class Handler {
     public:
         using index_t = uint32_t;
@@ -60,11 +62,6 @@ public:
         bool affects_all = true;
     };
 
-    void update(Scene::BatchRef& batch, const ParticleState& state) {
-        for (auto&& [_, handler] : handlers)
-            handler(batch->get_elements(), state);
-    }
-
     template <typename F>
     Handler& add_handler(const std::string& name, F&& function) {
         return handlers
@@ -105,6 +102,12 @@ public:
         return duration;
     }
 
+    template <typename T>
+    T& create_element(T&& element) {
+        elements.emplace_back(std::forward<T>(element));
+        return std::get<std::decay_t<T>>(elements.back());
+    }
+
 private:
     std::vector<Drawable> elements;
     std::map<std::string, Handler> handlers;
@@ -117,9 +120,12 @@ static inline constexpr float duration_endless = std::numeric_limits<float>::inf
 class ParticlesInstance {
 public:
     ParticlesInstance(Scene& scene, Scene::layer_t layer, Particles& iparticles):
-        particles(&iparticles), batch(scene.create_batch(layer, particles->get_elements())),
+        particles(&iparticles),
+        batch(scene.create_batch(layer, particles->get_elements())),
         duration(particles->get_duration()) {
         batch.delete_later();
+        for (auto&& [_, handler] : particles->handlers)
+            handlers.push_back(handler);
     }
 
     void set_batch(const Scene::BatchRef& ibatch) {
@@ -131,19 +137,28 @@ public:
     }
 
     void update(float timestep) {
-        particles->update(batch,
-                          {
-                              .batch = batch.get_pointer(),
-                              .timestep = timestep,
-                              .timestep_coef = timestep / duration,
-                              .time_elapsed = time_elapsed,
-                              .time_elapsed_coef = time_elapsed / duration,
-                          });
+        for (auto&& handler : handlers)
+            handler(batch->get_elements(),
+                    {
+                        .batch             = batch.get_pointer(),
+                        .timestep          = timestep,
+                        .timestep_coef     = timestep / duration,
+                        .time_elapsed      = time_elapsed,
+                        .time_elapsed_coef = time_elapsed / duration,
+                    });
         time_elapsed += timestep;
     }
 
     bool timeout() const {
         return time_elapsed >= duration;
+    }
+
+    void move(const sf::Vector2f& movement) {
+        batch->move(movement);
+    }
+
+    void scale(const sf::Vector2f& scale) {
+        batch->scale(scale);
     }
 
     auto& get_elements() {
@@ -155,10 +170,11 @@ public:
     }
 
 private:
+    std::vector<Particles::Handler> handlers;
     Particles* particles;
     Scene::BatchRef batch;
-    float time_elapsed;
     float duration;
+    float time_elapsed = 0.f;
 };
 
 
@@ -170,15 +186,18 @@ public:
         effects.insert_or_assign(name, std::move(effect));
     }
 
-    bool play(const std::string& name, Scene::layer_t layer, const sf::Vector2f& position = {0, 0}) {
+    bool play(const std::string&  name,
+              Scene::layer_t      layer,
+              const sf::Vector2f& position = {0, 0},
+              const sf::Vector2f& scale    = {1.f, 1.f}) {
         auto found = effects.find(name);
         if (found == effects.end())
             return false;
 
         running_effects.push_back(ParticlesInstance(*scene, layer, found->second));
         auto& instance = running_effects.back();
-        for (auto&& element : instance.get_elements())
-            std::visit([=](sf::Transformable& obj) { obj.move(position); }, element);
+        instance.move(position);
+        instance.scale(scale);
 
         return true;
     }
