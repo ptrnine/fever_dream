@@ -1,5 +1,6 @@
 set(_examples
     particles_gravity
+    particles_think
 )
 
 foreach(_example ${_examples})
