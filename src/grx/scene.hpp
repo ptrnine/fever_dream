@@ -53,9 +53,42 @@ public:
             return elements.back().emplace<T>(std::forward<Args>(args)...);
         }
 
+        auto get_users() const {
+            return users;
+        }
+
+        void move(const sf::Vector2f& movement) {
+            /* TODO: optimize for 0 0 movement */
+            for (auto& element : elements)
+                std::visit([&](auto&& obj) { obj.move(movement); }, element);
+        }
+
+        void scale(const sf::Vector2f& scale) {
+            /* TODO: optimize for 0 0 scale */
+            transform.scale(scale, calc_center());
+        }
+
+        sf::Vector2f calc_center() {
+            sf::Vector2f center{0, 0};
+            for (auto&& element : elements)
+                center +=
+                    std::visit([](auto&& obj) { return obj.getPosition(); }, element) * (1.f / float(elements.size()));
+            return center;
+        }
+
+    private:
+        void increment_users() {
+            ++users;
+        }
+
+        void decrement_users() {
+            --users;
+        }
+
     private:
         layer_t layer;
         std::vector<Drawable> elements;
+        sf::Transform transform = sf::Transform::Identity;
         uint32_t users = 0;
         bool delete_later = false;
     };
@@ -71,53 +104,47 @@ public:
         ItemRef() = default;
 
         ItemRef(const ItemRef& item): scene(item.scene), cached(item.cached), id(item.id) {
-            if (auto p = get_pointer())
-                ++p->users;
+            increment_users();
         }
 
         ItemRef& operator=(const ItemRef& item) {
             if (&item == this)
                 return *this;
 
-            if (auto p = get_pointer()) {
-                --p->users;
-                if (p->delete_later && p->users == 1)
-                    scene->delete_item(id);
-            }
+            destroy();
 
             scene = item.scene;
             cached = item.cached;
             id = item.id;
 
-            if (auto p = get_pointer())
-                ++p->users;
+            increment_users();
 
             return *this;
         }
 
         ItemRef(ItemRef&& item) noexcept: scene(item.scene), cached(item.cached), id(item.id) {
             item.cached = nullptr;
+            item.scene = nullptr;
         }
 
         ItemRef& operator=(ItemRef&& item) noexcept {
             if (&item == this)
                 return *this;
 
+            destroy();
+
             scene = item.scene;
             cached = item.cached;
             id = item.id;
 
             item.cached = nullptr;
+            item.scene = nullptr;
 
             return *this;
         }
 
         ~ItemRef() {
-            if (auto p = get_pointer()) {
-                --p->users;
-                if (p->delete_later && p->users == 1)
-                    scene->delete_item(id);
-            }
+            destroy();
         }
 
         void delete_later(bool value = true) {
@@ -149,7 +176,27 @@ public:
         }
 
     protected:
-        ItemRef(Scene* iscene, Batch* batch, id_t iid): scene(iscene), cached(batch), id(iid) {}
+        void destroy() {
+            //std::cout << "destroy [batch:" << id << "]" << std::endl;
+            if (!scene)
+                return;
+
+            if (auto p = get_pointer()) {
+                p->decrement_users();
+                if (p->delete_later && p->users == 0)
+                    scene->delete_item(id);
+            }
+        }
+
+        void increment_users() {
+            if (scene)
+                if (auto p = get_pointer())
+                    p->increment_users();
+        }
+
+        ItemRef(Scene* iscene, Batch* batch, id_t iid): scene(iscene), cached(batch), id(iid) {
+            get_pointer()->increment_users();
+        }
 
     private:
         Scene* scene = nullptr;
@@ -214,11 +261,17 @@ public:
 
 
     void draw(sf::RenderTarget& target, const sf::RenderStates& render_states = sf::RenderStates::Default) const {
-        for (auto [layer, _] : layers_usage)
-            for (auto&& [_, batch] : batches)
-                if (layer == batch.layer)
-                    for (auto element : batch.elements)
-                        downcast(element, [&](const sf::Drawable& drawable) { target.draw(drawable, render_states); });
+        for (auto [layer, _] : layers_usage) {
+            for (auto&& [_, batch] : batches) {
+                if (layer == batch.layer) {
+                    auto states = render_states;
+                    states.transform.combine(batch.transform);
+                    for (auto element : batch.elements) {
+                        downcast(element, [&](const sf::Drawable& drawable) { target.draw(drawable, states); });
+                    }
+                }
+            }
+        }
     }
 
     template <typename T, typename... Args>
