@@ -58,9 +58,7 @@ public:
         }
 
         void move(const sf::Vector2f& movement) {
-            /* TODO: optimize for 0 0 movement */
-            for (auto& element : elements)
-                std::visit([&](auto&& obj) { obj.move(movement); }, element);
+            transform.translate(movement);
         }
 
         void scale(const sf::Vector2f& scale) {

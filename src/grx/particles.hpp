@@ -5,6 +5,7 @@
 
 #include "scene.hpp"
 #include "../core/math.hpp"
+#include "animation_keys.hpp"
 
 namespace grx {
 struct ParticleState {
@@ -218,40 +219,9 @@ private:
 };
 
 namespace particle {
-    namespace details {
-        inline auto value_change(float max_movement, auto dependence) {
-            return [=, prev_t = 0.f](const ParticleState& state) mutable {
-                auto t = dependence(state.time_elapsed_coef);
-                auto step = t - prev_t;
-                prev_t = t;
-                return max_movement * step;
-            };
-        }
-    } // namespace details
-
-    template <typename F = decltype(core::dependence::linear<float>)>
-    inline auto x_movement(float max_movement, F dependence = core::dependence::linear<float>) {
-        return [=, f = details::value_change(max_movement, dependence)](sf::Transformable& obj,
-                                                                        const ParticleState& state) mutable {
-            obj.move(f(state), 0);
-        };
-    }
-
-    template <typename F = decltype(core::dependence::linear<float>)>
-    inline auto y_movement(float max_movement, F dependence = core::dependence::linear<float>) {
-        return [=, f = details::value_change(max_movement, dependence)](sf::Transformable& obj,
-                                                                        const ParticleState& state) mutable {
-            obj.move(0, f(state));
-        };
-    }
-
-    template <typename F = decltype(core::dependence::linear<float>)>
-    inline auto xy_movement(sf::Vector2f max_movement, F dependence = core::dependence::linear<float>) {
-        return [=,
-                fx = details::value_change(max_movement.x, dependence),
-                fy = details::value_change(max_movement.y, dependence)](sf::Transformable& obj,
-                                                                        const ParticleState& state) mutable {
-            obj.move(fx(state), fy(state));
+    inline auto position(const AnimKeySequence<sf::Vector2f>& keys) {
+        return [keys = keys](sf::Transformable& obj, const ParticleState& state) {
+            obj.setPosition(keys.lookup(state.time_elapsed_coef));
         };
     }
 
@@ -281,5 +251,7 @@ namespace particle {
             obj.move(velocity * state.timestep);
         };
     }
+
+    //inline auto opacity()
 };    // namespace particle
 } // namespace grx
