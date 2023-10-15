@@ -89,7 +89,7 @@ namespace dependence {
     }
 
     template <typename T>
-    T square(T value) {
+    T square_root(T value) {
         return std::pow(value, T(0.5));
     }
 } // namespace dependence
