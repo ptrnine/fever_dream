@@ -225,6 +225,18 @@ namespace particle {
         };
     }
 
+    inline auto scale(const AnimKeySequence<sf::Vector2f>& keys) {
+        return [keys = keys](sf::Transformable& obj, const ParticleState& state) {
+            obj.setScale(keys.lookup(state.time_elapsed_coef));
+        };
+    }
+
+    inline auto rotation(const AnimKeySequence<float>& keys) {
+        return [keys = keys](sf::Transformable& obj, const ParticleState& state) {
+            obj.setRotation(keys.lookup(state.time_elapsed_coef));
+        };
+    }
+
     inline auto gravity(const std::vector<float>& masses = {}, const std::vector<sf::Vector2f>& velocities = {}) {
         return [masses = masses, velocities = velocities](sf::Transformable& obj, const ParticleState& state) mutable {
             auto idx = state.idx;
