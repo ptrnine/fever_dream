@@ -7,7 +7,7 @@
 
 namespace grx
 {
-enum class Interpolation { disable = 0, linear, bezier };
+enum class Interpolation { hold = 0, linear, bezier };
 
 struct EaseVec2 {
     float x, y;
@@ -27,6 +27,26 @@ class AnimKeySequence {
 public:
     void push(const AnimKey<T>& key) {
         keys.push_back(key);
+    }
+
+    void push_hold(const T& value, float time) {
+        push(AnimKey<T>(value, time, Interpolation::hold));
+    }
+
+    void push_linear(const T& value, float time) {
+        push(AnimKey<T>{value, time, Interpolation::linear});
+    }
+
+    void push_linear_to_bezier(const T& value, float time, const EaseVec2& out) {
+        push(AnimKey<T>{value, time, Interpolation::bezier, {0, 0}, out});
+    }
+
+    void push_bezier_to_linear(const T& value, float time, const EaseVec2& in) {
+        push(AnimKey<T>{value, time, Interpolation::bezier, in, {1, 1}});
+    }
+
+    void push_bezier(const T& value, float time, const EaseVec2& in = {0, 0}, const EaseVec2& out = {1, 1}) {
+        push(AnimKey<T>{value, time, Interpolation::bezier, in, out});
     }
 
     void normalize_time() {
@@ -64,7 +84,7 @@ public:
 
 private:
     static T interpolate(const AnimKey<T>& k1, const AnimKey<T>& k2, float time) {
-        if (k2.interpolation == Interpolation::disable)
+        if (k2.interpolation == Interpolation::hold)
             return k1.value;
 
         auto t      = core::inverse_lerp(k1.time, k2.time, time);
