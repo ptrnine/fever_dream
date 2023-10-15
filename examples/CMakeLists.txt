@@ -1,6 +1,7 @@
 set(_examples
     particles_gravity
     particles_think
+    particles_animation_keys
 )
 
 foreach(_example ${_examples})
