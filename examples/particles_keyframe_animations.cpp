@@ -22,16 +22,29 @@ int main() {
     grx::ParticlesMgr particles_mgr{scene};
 
     grx::Particles effect;
-    effect.set_duration(2);
-    auto& square = effect.create_element(sf::RectangleShape({50, 50}));
-    square.setOrigin(25, 25);
+    effect.set_duration(1.5);
+    auto& square = effect.create_element(sf::RectangleShape({100, 100}));
+    square.setOrigin(square.getSize() * 0.5f);
 
-    grx::AnimKeySequence<sf::Vector2f> keys;
-    keys.push(grx::AnimKey<sf::Vector2f>{{0, 0}, 0, grx::Interpolation::bezier, {}, {0, 1}});
-    keys.push(grx::AnimKey<sf::Vector2f>{{600, 0}, 1, grx::Interpolation::bezier, {1, 0}, {}});
+    grx::AnimKeySequence<float> rotation_keys;
+    rotation_keys.push_linear_to_bezier(0, 0, {0.47, 1.64});
+    rotation_keys.push_bezier(180, 0.5, {0.41, 0.8}, {0.47, 1.64});
+    rotation_keys.push_bezier_to_linear(360, 1, {0.41, 0.8});
 
-    effect.add_handler("position", grx::particle::position(keys));
-    particles_mgr.add_effect("position", std::move(effect));
+    grx::AnimKeySequence<sf::Vector2f> scale_keys;
+    scale_keys.push_linear_to_bezier({1, 1}, 0, {0.47, 1.64});
+    scale_keys.push_bezier({2, 2}, 0.5, {0.41, 0.8}, {0.47, 1.64});
+    scale_keys.push_bezier_to_linear({1, 1}, 1, {0.41, 0.8});
+
+    grx::AnimKeySequence<sf::Vector2f> position_keys;
+    position_keys.push_linear_to_bezier({0, 0}, 0, {0.47, 1.64});
+    position_keys.push_bezier({600, 400}, 0.5, {0.41, 0.8}, {0.47, 1.64});
+    position_keys.push_bezier_to_linear({600, 200}, 1, {0.41, 0.8});
+
+    effect.add_handler("scale", grx::particle::scale(scale_keys));
+    effect.add_handler("rotation", grx::particle::rotation(rotation_keys));
+    effect.add_handler("position", grx::particle::position(position_keys));
+    particles_mgr.add_effect("square", std::move(effect));
 
     sf::Clock clock;
     bool running = true;
@@ -49,7 +62,7 @@ int main() {
                 running = false;
             if (event.type == sf::Event::MouseButtonPressed) {
                 auto pos = sf::Mouse::getPosition(wnd);
-                particles_mgr.play("position", 0, {float(pos.x), float(pos.y)});
+                particles_mgr.play("square", 0, {float(pos.x), float(pos.y)});
             }
         }
 
