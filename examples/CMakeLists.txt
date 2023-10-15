@@ -1,7 +1,7 @@
 set(_examples
     particles_gravity
     particles_think
-    particles_animation_keys
+    particles_keyframe_animations
 )
 
 foreach(_example ${_examples})

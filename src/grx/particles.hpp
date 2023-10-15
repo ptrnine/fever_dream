@@ -5,7 +5,7 @@
 
 #include "scene.hpp"
 #include "../core/math.hpp"
-#include "animation_keys.hpp"
+#include "keyframe_animation.hpp"
 
 namespace grx {
 struct ParticleState {
