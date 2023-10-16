@@ -265,7 +265,5 @@ namespace particle {
             obj.move(velocity * state.timestep);
         };
     }
-
-    //inline auto opacity()
 };    // namespace particle
 } // namespace grx
