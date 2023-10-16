@@ -5,7 +5,7 @@
 #include <iostream>
 
 #include "grx/scene.hpp"
-#include "grx/particles.hpp"
+#include "grx/efx.hpp"
 
 int main() {
     core::vec2u      window_size{1800, 1000};
@@ -18,23 +18,23 @@ int main() {
     wnd.setActive();
     wnd.setVerticalSyncEnabled(false);
 
-    grx::Scene scene;
+    grx::scene scene;
 
-    grx::ParticlesMgr particles_mgr{scene};
+    grx::efx_mgr efx_mgr{scene};
 
     sf::Texture texture;
     texture.loadFromFile("resources/test/think.png");
     texture.setSmooth(true);
 
-    grx::Particles effect;
+    grx::efx effect;
     effect.set_duration(2);
 
     std::vector<core::vec2f> velocities;
-    std::vector<float> masses;
+    std::vector<float>       masses;
 
     for (size_t i = 0; i < 12; ++i) {
-        constexpr auto pi2 = M_PIf32 * 2;
-        auto angle = float(i) / 12 * pi2;
+        constexpr auto pi2   = M_PIf32 * 2;
+        auto           angle = float(i) / 12 * pi2;
 
         auto x = std::cos(angle);
         auto y = std::sin(angle);
@@ -56,24 +56,24 @@ int main() {
     velocities.push_back({0.f, 0.f});
     masses.push_back(1000.f);
 
-    effect.add_handler("gravity", grx::particle::gravity(masses, velocities));
-    effect.add_handler("opacity", [](sf::Shape& shape, const grx::ParticleState& state) {
+    effect.add_handler("gravity", grx::efx_handlers::gravity(masses, velocities));
+    effect.add_handler("opacity", [](sf::Shape& shape, const grx::efx_state& state) {
         constexpr auto threshold = 0.4f;
-        auto opacity = 1.f;
+        auto           opacity   = 1.f;
         if (state.time_elapsed_coef > threshold)
             opacity = 1.f - core::inverse_lerp(threshold, 1.0, state.time_elapsed_coef);
 
         opacity = core::dependence::quadratic(opacity);
 
         auto color = shape.getFillColor();
-        color.a = uint8_t(255 * opacity);
+        color.a    = uint8_t(255 * opacity);
         shape.setFillColor(color);
     });
 
-    particles_mgr.add_effect("think", std::move(effect));
+    efx_mgr.add_effect("think", std::move(effect));
 
     sf::Clock clock;
-    bool running = true;
+    bool      running = true;
 
     size_t    frames = 0;
     sf::Clock fps_clock;
@@ -88,7 +88,7 @@ int main() {
                 running = false;
             if (event.type == sf::Event::MouseButtonPressed) {
                 auto pos = sf::Mouse::getPosition(wnd);
-                particles_mgr.play("think", 0, {float(pos.x), float(pos.y)}, {0.5, 0.5});
+                efx_mgr.play("think", 0, {float(pos.x), float(pos.y)}, {0.5, 0.5});
             }
         }
 
@@ -102,7 +102,7 @@ int main() {
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        particles_mgr.update(timestep.asSeconds());
+        efx_mgr.update(timestep.asSeconds());
         scene.draw(wnd);
         wnd.display();
     }

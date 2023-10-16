@@ -11,28 +11,24 @@
 #include "core/vec.hpp"
 #include "sfml_types.hpp"
 
-namespace grx {
+namespace grx
+{
 
-class Scene {
+class scene {
 public:
     using layer_t = uint64_t;
     using id_t    = uint64_t;
 
     static inline constexpr auto empty_id = std::numeric_limits<id_t>::max();
 
-    friend class ItemRef;
-    friend class BatchRef;
-    friend class ElementRef;
-
-
-    class Batch {
+    class batch {
     public:
-        friend Scene;
+        friend scene;
 
-        Batch(layer_t ilayer = 0): layer(ilayer) {}
+        batch(layer_t ilayer = 0): layer(ilayer) {}
 
-        Batch(Batch&&) = default;
-        Batch& operator=(Batch&&) = default;
+        batch(batch&&)            = default;
+        batch& operator=(batch&&) = default;
 
         layer_t get_layer() const {
             return layer;
@@ -56,7 +52,7 @@ public:
             return elements.back().emplace<T>(std::forward<Args>(args)...);
         }
 
-        void draw(const Scene*      scene,
+        void draw(const scene*      scene,
                   sf::RenderTarget& target,
                   sf::RenderStates  render_states = sf::RenderStates::Default) const {
             if (elements.empty())
@@ -98,7 +94,7 @@ public:
             --users;
         }
 
-        sf::Transform calc_final_transform(const Scene* scene) const {
+        sf::Transform calc_final_transform(const scene* scene) const {
             if (parent_id != empty_id) {
                 auto parent = scene->get_batch_pointer(parent_id);
                 if (parent)
@@ -108,65 +104,65 @@ public:
         }
 
     private:
-        layer_t               layer;
-        std::vector<Drawable> elements;
-        sf::Transform         transform    = sf::Transform::Identity;
-        id_t                  parent_id    = empty_id;
-        uint32_t              users        = 0;
-        bool                  delete_later = false;
+        layer_t                 layer;
+        std::vector<drawable_t> elements;
+        sf::Transform           transform    = sf::Transform::Identity;
+        id_t                    parent_id    = empty_id;
+        uint32_t                users        = 0;
+        bool                    delete_later = false;
     };
 
-    using batch_storage_t = std::map<id_t, Batch>;
+    using batch_storage_t = std::map<id_t, batch>;
 
-    class BatchRef;
+    class batch_ref;
 
-    class ItemRef {
+    class item_ref {
     public:
-        friend Scene;
+        friend scene;
 
-        ItemRef() = default;
+        item_ref() = default;
 
-        ItemRef(const ItemRef& item): scene(item.scene), cached(item.cached), id(item.id) {
+        item_ref(const item_ref& item): s(item.s), cached(item.cached), id(item.id) {
             increment_users();
         }
 
-        ItemRef& operator=(const ItemRef& item) {
+        item_ref& operator=(const item_ref& item) {
             if (&item == this)
                 return *this;
 
             destroy();
 
-            scene = item.scene;
+            s      = item.s;
             cached = item.cached;
-            id = item.id;
+            id     = item.id;
 
             increment_users();
 
             return *this;
         }
 
-        ItemRef(ItemRef&& item) noexcept: scene(item.scene), cached(item.cached), id(item.id) {
+        item_ref(item_ref&& item) noexcept: s(item.s), cached(item.cached), id(item.id) {
             item.cached = nullptr;
-            item.scene = nullptr;
+            item.s      = nullptr;
         }
 
-        ItemRef& operator=(ItemRef&& item) noexcept {
+        item_ref& operator=(item_ref&& item) noexcept {
             if (&item == this)
                 return *this;
 
             destroy();
 
-            scene = item.scene;
+            s      = item.s;
             cached = item.cached;
-            id = item.id;
+            id     = item.id;
 
             item.cached = nullptr;
-            item.scene = nullptr;
+            item.s      = nullptr;
 
             return *this;
         }
 
-        ~ItemRef() {
+        ~item_ref() {
             destroy();
         }
 
@@ -178,100 +174,98 @@ public:
             return id;
         }
 
-        Scene* get_scene() const {
-            return scene;
+        scene* get_scene() const {
+            return s;
         }
 
         layer_t get_layer() const {
             return get_pointer()->get_layer();
         }
 
-        Batch* get_pointer() {
+        batch* get_pointer() {
             if (!cached)
-                return cached = scene->get_batch_pointer(id);
+                return cached = s->get_batch_pointer(id);
             return cached;
         }
 
-        const Batch* get_pointer() const {
+        const batch* get_pointer() const {
             if (!cached)
-                return cached = scene->get_batch_pointer(id);
+                return cached = s->get_batch_pointer(id);
             return cached;
         }
 
-        void set_parent(const ItemRef& item) {
+        void set_parent(const item_ref& item) {
             get_pointer()->parent_id = item.id;
         }
 
-        BatchRef get_parent();
+        batch_ref get_parent();
 
         explicit operator bool() const {
-            return scene;
+            return s;
         }
 
     protected:
         void destroy() {
-            //std::cout << "destroy [batch:" << id << "]" << std::endl;
-            if (!scene)
+            // std::cout << "destroy [batch:" << id << "]" << std::endl;
+            if (!s)
                 return;
 
             if (auto p = get_pointer()) {
                 p->decrement_users();
                 if (p->delete_later && p->users == 0)
-                    scene->delete_item(id);
+                    s->delete_item(id);
             }
         }
 
         void increment_users() {
-            if (scene)
+            if (s)
                 if (auto p = get_pointer())
                     p->increment_users();
         }
 
-        ItemRef(Scene* iscene, Batch* batch, id_t iid): scene(iscene), cached(batch), id(iid) {
+        item_ref(scene* iscene, batch* batch, id_t iid): s(iscene), cached(batch), id(iid) {
             get_pointer()->increment_users();
         }
 
     private:
-        Scene* scene = nullptr;
-        mutable Batch* cached = nullptr;
-        id_t id;
+        scene*         s      = nullptr;
+        mutable batch* cached = nullptr;
+        id_t           id;
     };
 
-
-    class BatchRef : public ItemRef {
+    class batch_ref : public item_ref {
     public:
-        friend Scene;
-        friend ItemRef;
+        friend class scene;
+        friend item_ref;
 
-        BatchRef(): ItemRef() {}
+        batch_ref(): item_ref() {}
 
-        Batch* operator->() {
+        batch* operator->() {
             return get_pointer();
         }
 
-        const Batch* operator->() const {
+        const batch* operator->() const {
             return get_pointer();
         }
 
-        Batch& operator*() {
+        batch& operator*() {
             return *get_pointer();
         }
 
-        const Batch& operator*() const {
+        const batch& operator*() const {
             return *get_pointer();
         }
 
     private:
-        BatchRef(Scene* scene, Batch* batch, id_t id): ItemRef(scene, batch, id) {}
+        batch_ref(class scene* scene, batch* batch, id_t id): item_ref(scene, batch, id) {}
     };
 
-
     template <typename T>
-    class ElementRef : public ItemRef {
+    class element_ref : public item_ref {
     public:
-        friend Scene;
+        friend class scene;
 
-        ElementRef(): ItemRef() {}
+        element_ref(): item_ref() {}
 
         T* operator->() {
             return &operator*();
@@ -290,9 +284,8 @@ public:
         }
 
     private:
-        ElementRef(Scene* scene, Batch* batch, id_t id): ItemRef(scene, batch, id) {}
+        element_ref(class scene* scene, batch* batch, id_t id): item_ref(scene, batch, id) {}
     };
-
 
     void draw(sf::RenderTarget& target, const sf::RenderStates& render_states = sf::RenderStates::Default) const {
         for (auto [layer, _] : layers_usage)
@@ -302,10 +295,10 @@ public:
     }
 
     template <typename T, typename... Args>
-    ElementRef<T> create_element(layer_t layer = 0, Args&&... args) {
+    element_ref<T> create_element(layer_t layer = 0, Args&&... args) {
         auto id = next_id();
 
-        Batch batch{layer};
+        batch batch{layer};
         batch.create_element<T>(std::forward<Args>(args)...);
 
         auto [bucket, _] = batches.emplace(id, std::move(batch));
@@ -314,14 +307,14 @@ public:
         return {this, bucket, id};
     }
 
-    BatchRef create_batch(layer_t layer = 0) {
-        auto id = next_id();
+    batch_ref create_batch(layer_t layer = 0) {
+        auto id          = next_id();
         auto [bucket, _] = batches.emplace(id, layer);
         ++layers_usage[layer];
         return {this, &bucket->second, id};
     }
 
-    BatchRef create_batch(layer_t layer, auto&& drawables) {
+    batch_ref create_batch(layer_t layer, auto&& drawables) {
         auto batch = create_batch(layer);
         batch->set_elements(drawables);
         return batch;
@@ -338,7 +331,7 @@ public:
         return true;
     }
 
-    bool delete_item(const ItemRef& item) {
+    bool delete_item(const item_ref& item) {
         return delete_item(item.get_id());
     }
 
@@ -348,12 +341,11 @@ public:
 
     size_t get_elements_count() const {
         size_t result = 0;
-        for (auto&& batch : batches)
-            result += batch.second.elements.size();
+        for (auto&& batch : batches) result += batch.second.elements.size();
         return result;
     }
 
-    BatchRef get_batch(id_t id) {
+    batch_ref get_batch(id_t id) {
         if (auto p = get_batch_pointer(id); p)
             return {this, p, id};
         return {};
@@ -364,14 +356,14 @@ private:
         return id_counter++;
     }
 
-    Batch* get_batch_pointer(id_t id) {
+    batch* get_batch_pointer(id_t id) {
         auto bucket = batches.find(id);
         if (bucket != batches.end())
             return &bucket->second;
         return nullptr;
     }
 
-    const Batch* get_batch_pointer(id_t id) const {
+    const batch* get_batch_pointer(id_t id) const {
         auto bucket = batches.find(id);
         if (bucket != batches.end())
             return &bucket->second;
@@ -379,13 +371,12 @@ private:
     }
 
 private:
-    std::map<id_t, Batch> batches;
+    std::map<id_t, batch>       batches;
     std::map<layer_t, uint64_t> layers_usage;
-    id_t id_counter = 0;
+    id_t                        id_counter = 0;
 };
 
-
-inline Scene::BatchRef Scene::ItemRef::get_parent() {
-    return scene->get_batch(get_pointer()->parent_id);
+inline scene::batch_ref scene::item_ref::get_parent() {
+    return s->get_batch(get_pointer()->parent_id);
 }
 } // namespace grx

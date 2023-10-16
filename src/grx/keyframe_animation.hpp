@@ -3,50 +3,46 @@
 #include <vector>
 
 #include "core/math.hpp"
-
+#include "core/vec.hpp"
 
 namespace grx
 {
-enum class Interpolation { hold = 0, linear, bezier };
-
-struct EaseVec2 {
-    float x, y;
-};
+enum class interpolation_t { hold = 0, linear, bezier };
 
 template <typename T>
-struct AnimKey {
+struct anim_key {
     T value;
     float time;
-    Interpolation interpolation;
-    EaseVec2 in;
-    EaseVec2 out;
+    interpolation_t interpolation;
+    core::vec2f in;
+    core::vec2f out;
 };
 
 template <typename T>
-class AnimKeySequence {
+class anim_key_sequence {
 public:
-    void push(const AnimKey<T>& key) {
+    void push(const anim_key<T>& key) {
         keys.push_back(key);
     }
 
     void push_hold(const T& value, float time) {
-        push(AnimKey<T>(value, time, Interpolation::hold));
+        push(anim_key<T>(value, time, interpolation_t::hold));
     }
 
     void push_linear(const T& value, float time) {
-        push(AnimKey<T>{value, time, Interpolation::linear});
+        push(anim_key<T>{value, time, interpolation_t::linear});
     }
 
-    void push_linear_to_bezier(const T& value, float time, const EaseVec2& out) {
-        push(AnimKey<T>{value, time, Interpolation::bezier, {0, 0}, out});
+    void push_linear_to_bezier(const T& value, float time, const core::vec2f& out) {
+        push(anim_key<T>{value, time, interpolation_t::bezier, {0, 0}, out});
     }
 
-    void push_bezier_to_linear(const T& value, float time, const EaseVec2& in) {
-        push(AnimKey<T>{value, time, Interpolation::bezier, in, {1, 1}});
+    void push_bezier_to_linear(const T& value, float time, const core::vec2f& in) {
+        push(anim_key<T>{value, time, interpolation_t::bezier, in, {1, 1}});
     }
 
-    void push_bezier(const T& value, float time, const EaseVec2& in = {0, 0}, const EaseVec2& out = {1, 1}) {
-        push(AnimKey<T>{value, time, Interpolation::bezier, in, out});
+    void push_bezier(const T& value, float time, const core::vec2f& in = {0, 0}, const core::vec2f& out = {1, 1}) {
+        push(anim_key<T>{value, time, interpolation_t::bezier, in, out});
     }
 
     void normalize_time() {
@@ -73,9 +69,9 @@ public:
         if (k2 == keys.end())
             return keys.back().value;
 
-        AnimKey<T> k1;
+        anim_key<T> k1;
         if (k2 == keys.begin())
-            k1 = AnimKey<T>{{}, 0, Interpolation::linear};
+            k1 = anim_key<T>{{}, 0, interpolation_t::linear};
         else
             k1 = *(k2 - 1);
 
@@ -83,8 +79,8 @@ public:
     }
 
 private:
-    static T interpolate(const AnimKey<T>& k1, const AnimKey<T>& k2, float time) {
-        if (k2.interpolation == Interpolation::hold)
+    static T interpolate(const anim_key<T>& k1, const anim_key<T>& k2, float time) {
+        if (k2.interpolation == interpolation_t::hold)
             return k1.value;
 
         auto t      = core::inverse_lerp(k1.time, k2.time, time);
@@ -94,24 +90,24 @@ private:
         auto inv_t2 = inv_t * inv_t;
         auto inv_t3 = inv_t2 * inv_t;
 
-        unsigned f = (unsigned(k1.interpolation == Interpolation::bezier) << 1) |
-                     unsigned(k2.interpolation == Interpolation::bezier);
+        unsigned f = (unsigned(k1.interpolation == interpolation_t::bezier) << 1) |
+                     unsigned(k2.interpolation == interpolation_t::bezier);
 
         switch (f) {
         /* k1 and k2 are linear */
         case 0: return core::lerp(k1.value, k2.value, t);
         /* k1 is linear, k2 is bezier */
-        case 1: return core::cubic_bezier(k1.value, k2.value, 0.f, 0.f, k2.in.x, k2.in.y, t);
+        case 1: return core::cubic_bezier(k1.value, k2.value, 0.f, 0.f, k2.in.x(), k2.in.y(), t);
         /* k1 is bezier, k2 is linear */
-        case 2: return core::cubic_bezier(k1.value, k2.value, k1.out.x, k1.out.y, 1.f, 1.f, t);
+        case 2: return core::cubic_bezier(k1.value, k2.value, k1.out.x(), k1.out.y(), 1.f, 1.f, t);
         /* k1 and k2 are bezier */
-        case 3: return core::cubic_bezier(k1.value, k2.value, k1.out.x, k1.out.y, k2.in.x, k2.in.y, t);
+        case 3: return core::cubic_bezier(k1.value, k2.value, k1.out.x(), k1.out.y(), k2.in.x(), k2.in.y(), t);
         }
 
         return {};
     }
 
 private:
-    std::vector<AnimKey<T>> keys;
+    std::vector<anim_key<T>> keys;
 };
 }; // namespace grx

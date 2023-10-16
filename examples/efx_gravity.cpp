@@ -5,7 +5,7 @@
 #include <SFML/OpenGL.hpp>
 
 #include "grx/scene.hpp"
-#include "grx/particles.hpp"
+#include "grx/efx.hpp"
 
 int main() {
     sf::ContextSettings context_settings{0, 0, 8, 4, 6};
@@ -15,22 +15,22 @@ int main() {
     wnd.setActive();
     wnd.setVerticalSyncEnabled(false);
 
-    grx::Scene scene;
+    grx::scene scene;
 
-    grx::ParticlesMgr particles_mgr{scene};
+    grx::efx_mgr efx_mgr{scene};
 
-    grx::Particles particles;
-    particles.set_duration(grx::duration_endless);
+    grx::efx efx;
+    efx.set_duration(grx::duration_endless);
     for (float x = 100; x < window_size.x() - 100; x += 24) {
         for (float y = 100; y < window_size.y() - 100; y += 24) {
             sf::CircleShape element{4};
             element.setFillColor(sf::Color::Yellow);
             element.setPosition(x, y);
-            particles.get_elements().push_back(std::move(element));
+            efx.get_elements().push_back(std::move(element));
         }
     }
-    particles.add_handler("gravity", grx::particle::gravity(std::vector<float>(2278, 0.1f)));
-    particles_mgr.add_effect("gravity-test", std::move(particles));
+    efx.add_handler("gravity", grx::efx_handlers::gravity(std::vector<float>(2278, 0.1f)));
+    efx_mgr.add_effect("gravity-test", std::move(efx));
 
     bool      running = true;
     sf::Clock clock;
@@ -38,7 +38,7 @@ int main() {
     size_t    frames = 0;
     sf::Clock fps_clock;
 
-    particles_mgr.play("gravity-test", 0);
+    efx_mgr.play("gravity-test", 0);
 
     while (running) {
         auto timestep = clock.getElapsedTime();
@@ -60,7 +60,7 @@ int main() {
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        particles_mgr.update(timestep.asSeconds());
+        efx_mgr.update(timestep.asSeconds());
         scene.draw(wnd);
         wnd.display();
     }

@@ -10,26 +10,25 @@
 
 namespace grx
 {
-struct ParticleState {
-    const Scene::Batch* batch;
-    float timestep;
-    float timestep_coef;
-    float time_elapsed;
-    float time_elapsed_coef;
-    uint32_t idx;
+struct efx_state {
+    const scene::batch* batch;
+    float               timestep;
+    float               timestep_coef;
+    float               time_elapsed;
+    float               time_elapsed_coef;
+    uint32_t            idx;
 };
 
-
-class Particles {
+class efx {
 public:
-    friend class ParticlesInstance;
+    friend class efx_instance;
 
-    class Handler {
+    class handler_t {
     public:
         using index_t = uint32_t;
 
         template <typename F>
-        Handler(F&& function): handler(std::forward<F>(function)) {}
+        handler_t(F&& function): handler(std::forward<F>(function)) {}
 
         void set_affected_indices(std::initializer_list<index_t> indices) {
             affects_all = false;
@@ -44,7 +43,7 @@ public:
             return affected_indices;
         }
 
-        void operator()(auto& drawables, ParticleState state) {
+        void operator()(auto& drawables, efx_state state) {
             if (affects_all) {
                 for (size_t idx = 0; idx < drawables.size(); ++idx) {
                     state.idx = idx;
@@ -60,29 +59,29 @@ public:
         }
 
     private:
-        std::vector<index_t> affected_indices;
-        std::function<void(Drawable&, const ParticleState&)> handler;
-        bool affects_all = true;
+        std::vector<index_t>                               affected_indices;
+        std::function<void(drawable_t&, const efx_state&)> handler;
+        bool                                               affects_all = true;
     };
 
     template <typename F>
-    Handler& add_handler(const std::string& name, F&& function) {
+    handler_t& add_handler(const std::string& name, F&& function) {
         return handlers
             .insert_or_assign(name,
-                              [f = std::forward<F>(function)](Drawable& drawable, const ParticleState& state) mutable {
+                              [f = std::forward<F>(function)](drawable_t& drawable, const efx_state& state) mutable {
                                   downcast(drawable, std::forward<F>(f), state);
                               })
             .first->second;
     }
 
-    Handler* get_handler(const std::string& name) {
+    handler_t* get_handler(const std::string& name) {
         auto bucket = handlers.find(name);
         if (bucket == handlers.end())
             return nullptr;
         return &bucket->second;
     }
 
-    const Handler* get_handler(const std::string& name) const {
+    const handler_t* get_handler(const std::string& name) const {
         auto bucket = handlers.find(name);
         if (bucket == handlers.end())
             return nullptr;
@@ -112,26 +111,22 @@ public:
     }
 
 private:
-    std::vector<Drawable> elements;
-    std::map<std::string, Handler> handlers;
-    float duration;
+    std::vector<drawable_t>          elements;
+    std::map<std::string, handler_t> handlers;
+    float                            duration;
 };
-
 
 static inline constexpr float duration_endless = std::numeric_limits<float>::infinity();
 
-class ParticlesInstance {
+class efx_instance {
 public:
-    ParticlesInstance(Scene& scene, Scene::layer_t layer, Particles& iparticles):
-        particles(&iparticles),
-        batch(scene.create_batch(layer, particles->get_elements())),
-        duration(particles->get_duration()) {
+    efx_instance(scene& scene, scene::layer_t layer, efx& iefx):
+        e(&iefx), batch(scene.create_batch(layer, e->get_elements())), duration(e->get_duration()) {
         batch.delete_later();
-        for (auto&& [_, handler] : particles->handlers)
-            handlers.push_back(handler);
+        for (auto&& [_, handler] : e->handlers) handlers.push_back(handler);
     }
 
-    void set_batch(const Scene::BatchRef& ibatch) {
+    void set_batch(const scene::batch_ref& ibatch) {
         batch = ibatch;
     }
 
@@ -173,31 +168,30 @@ public:
     }
 
 private:
-    std::vector<Particles::Handler> handlers;
-    Particles* particles;
-    Scene::BatchRef batch;
-    float duration;
-    float time_elapsed = 0.f;
+    std::vector<efx::handler_t> handlers;
+    efx*                        e;
+    scene::batch_ref            batch;
+    float                       duration;
+    float                       time_elapsed = 0.f;
 };
 
-
-class ParticlesMgr {
+class efx_mgr {
 public:
-    ParticlesMgr(Scene& iscene): scene(&iscene) {}
+    efx_mgr(scene& iscene): s(&iscene) {}
 
-    void add_effect(const std::string& name, Particles effect) {
+    void add_effect(const std::string& name, efx effect) {
         effects.insert_or_assign(name, std::move(effect));
     }
 
     bool play(const std::string& name,
-              Scene::layer_t     layer,
+              scene::layer_t     layer,
               const core::vec2f& position = {0, 0},
               const core::vec2f& scale    = {1.f, 1.f}) {
         auto found = effects.find(name);
         if (found == effects.end())
             return false;
 
-        running_effects.push_back(ParticlesInstance(*scene, layer, found->second));
+        running_effects.push_back(efx_instance(*s, layer, found->second));
         auto& instance = running_effects.back();
         instance.move(position);
         instance.scale(scale);
@@ -215,33 +209,34 @@ public:
     }
 
 private:
-    Scene* scene;
-    std::map<std::string, Particles> effects;
-    std::list<ParticlesInstance> running_effects;
+    scene*                     s;
+    std::map<std::string, efx> effects;
+    std::list<efx_instance>    running_effects;
 };
 
-namespace particle {
-    inline auto position(const AnimKeySequence<core::vec2f>& keys) {
-        return [keys = keys](sf::Transformable& obj, const ParticleState& state) {
+namespace efx_handlers
+{
+    inline auto position(const anim_key_sequence<core::vec2f>& keys) {
+        return [keys = keys](sf::Transformable& obj, const efx_state& state) {
             obj.setPosition(keys.lookup(state.time_elapsed_coef));
         };
     }
 
-    inline auto scale(const AnimKeySequence<core::vec2f>& keys) {
-        return [keys = keys](sf::Transformable& obj, const ParticleState& state) {
+    inline auto scale(const anim_key_sequence<core::vec2f>& keys) {
+        return [keys = keys](sf::Transformable& obj, const efx_state& state) {
             obj.setScale(keys.lookup(state.time_elapsed_coef));
         };
     }
 
-    inline auto rotation(const AnimKeySequence<float>& keys) {
-        return [keys = keys](sf::Transformable& obj, const ParticleState& state) {
+    inline auto rotation(const anim_key_sequence<float>& keys) {
+        return [keys = keys](sf::Transformable& obj, const efx_state& state) {
             obj.setRotation(keys.lookup(state.time_elapsed_coef));
         };
     }
 
     inline auto gravity(const std::vector<float>& masses = {}, const std::vector<core::vec2f>& velocities = {}) {
-        return [masses = masses, velocities = velocities](sf::Transformable& obj, const ParticleState& state) mutable {
-            auto idx = state.idx;
+        return [masses = masses, velocities = velocities](sf::Transformable& obj, const efx_state& state) mutable {
+            auto  idx    = state.idx;
             auto& bodies = state.batch->get_elements();
 
             if (bodies.size() > masses.size())
@@ -255,8 +250,8 @@ namespace particle {
                 if (i == idx)
                     continue;
                 auto mass = masses[i];
-                auto pos = std::visit([](auto&& obj) { return obj.getPosition(); }, bodies[i]);
-                auto dir = core::vec2f(pos - obj.getPosition()).normalize();
+                auto pos  = std::visit([](auto&& obj) { return obj.getPosition(); }, bodies[i]);
+                auto dir  = core::vec2f(pos - obj.getPosition()).normalize();
                 accel += dir * mass;
             }
 
@@ -265,5 +260,5 @@ namespace particle {
             obj.move(velocity * state.timestep);
         };
     }
-};    // namespace particle
+}; // namespace efx_handlers
 } // namespace grx

@@ -10,7 +10,7 @@
 #include <SFML/Graphics/VertexBuffer.hpp>
 
 namespace grx {
-using Drawable = std::variant<sf::Sprite, sf::Text, sf::CircleShape, sf::ConvexShape, sf::RectangleShape>;
+using drawable_t = std::variant<sf::Sprite, sf::Text, sf::CircleShape, sf::ConvexShape, sf::RectangleShape>;
 
 template <class... Ts>
 struct overloaded : Ts... {
