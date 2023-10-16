@@ -59,6 +59,9 @@ public:
         void draw(const Scene*      scene,
                   sf::RenderTarget& target,
                   sf::RenderStates  render_states = sf::RenderStates::Default) const {
+            if (elements.empty())
+                return;
+
             auto final_transform = calc_final_transform(scene);
             render_states.transform.combine(final_transform);
             for (auto element : elements)
