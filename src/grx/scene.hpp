@@ -16,7 +16,9 @@ namespace grx {
 class Scene {
 public:
     using layer_t = uint64_t;
-    using id_t = uint64_t;
+    using id_t    = uint64_t;
+
+    static inline constexpr auto empty_id = std::numeric_limits<id_t>::max();
 
     friend class ItemRef;
     friend class BatchRef;
@@ -54,6 +56,15 @@ public:
             return elements.back().emplace<T>(std::forward<Args>(args)...);
         }
 
+        void draw(const Scene*      scene,
+                  sf::RenderTarget& target,
+                  sf::RenderStates  render_states = sf::RenderStates::Default) const {
+            auto final_transform = calc_final_transform(scene);
+            render_states.transform.combine(final_transform);
+            for (auto element : elements)
+                downcast(element, [&](const sf::Drawable& drawable) { target.draw(drawable, render_states); });
+        }
+
         auto get_users() const {
             return users;
         }
@@ -84,17 +95,27 @@ public:
             --users;
         }
 
-    private:
-        layer_t layer;
-        std::vector<Drawable> elements;
-        sf::Transform transform = sf::Transform::Identity;
-        uint32_t users = 0;
-        bool delete_later = false;
-    };
+        sf::Transform calc_final_transform(const Scene* scene) const {
+            if (parent_id != empty_id) {
+                auto parent = scene->get_batch_pointer(parent_id);
+                if (parent)
+                    return parent->calc_final_transform(scene) * transform;
+            }
+            return transform;
+        }
 
+    private:
+        layer_t               layer;
+        std::vector<Drawable> elements;
+        sf::Transform         transform    = sf::Transform::Identity;
+        id_t                  parent_id    = empty_id;
+        uint32_t              users        = 0;
+        bool                  delete_later = false;
+    };
 
     using batch_storage_t = std::map<id_t, Batch>;
 
+    class BatchRef;
 
     class ItemRef {
     public:
@@ -174,6 +195,16 @@ public:
             return cached;
         }
 
+        void set_parent(const ItemRef& item) {
+            get_pointer()->parent_id = item.id;
+        }
+
+        BatchRef get_parent();
+
+        explicit operator bool() const {
+            return scene;
+        }
+
     protected:
         void destroy() {
             //std::cout << "destroy [batch:" << id << "]" << std::endl;
@@ -207,6 +238,7 @@ public:
     class BatchRef : public ItemRef {
     public:
         friend Scene;
+        friend ItemRef;
 
         BatchRef(): ItemRef() {}
 
@@ -260,17 +292,10 @@ public:
 
 
     void draw(sf::RenderTarget& target, const sf::RenderStates& render_states = sf::RenderStates::Default) const {
-        for (auto [layer, _] : layers_usage) {
-            for (auto&& [_, batch] : batches) {
-                if (layer == batch.layer) {
-                    auto states = render_states;
-                    states.transform.combine(batch.transform);
-                    for (auto element : batch.elements) {
-                        downcast(element, [&](const sf::Drawable& drawable) { target.draw(drawable, states); });
-                    }
-                }
-            }
-        }
+        for (auto [layer, _] : layers_usage)
+            for (auto&& [_, batch] : batches)
+                if (layer == batch.layer)
+                    batch.draw(this, target, render_states);
     }
 
     template <typename T, typename... Args>
@@ -325,6 +350,12 @@ public:
         return result;
     }
 
+    BatchRef get_batch(id_t id) {
+        if (auto p = get_batch_pointer(id); p)
+            return {this, p, id};
+        return {};
+    }
+
 private:
     id_t next_id() {
         return id_counter++;
@@ -337,9 +368,21 @@ private:
         return nullptr;
     }
 
+    const Batch* get_batch_pointer(id_t id) const {
+        auto bucket = batches.find(id);
+        if (bucket != batches.end())
+            return &bucket->second;
+        return nullptr;
+    }
+
 private:
     std::map<id_t, Batch> batches;
     std::map<layer_t, uint64_t> layers_usage;
     id_t id_counter = 0;
 };
+
+
+inline Scene::BatchRef Scene::ItemRef::get_parent() {
+    return scene->get_batch(get_pointer()->parent_id);
+}
 } // namespace grx
