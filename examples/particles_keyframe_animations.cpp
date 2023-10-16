@@ -8,9 +8,9 @@
 #include "grx/particles.hpp"
 
 int main() {
-    sf::Vector2f     window_size{1800, 1000};
+    core::vec2u      window_size{1800, 1000};
     sf::RenderWindow wnd{
-        sf::VideoMode(window_size.x, window_size.y),
+        sf::VideoMode(window_size.x(), window_size.y()),
         "test window",
         sf::Style::Default,
         sf::ContextSettings{24, 8, 8},
@@ -31,12 +31,12 @@ int main() {
     rotation_keys.push_bezier(180, 0.5, {0.41, 0.8}, {0.47, 1.64});
     rotation_keys.push_bezier_to_linear(360, 1, {0.41, 0.8});
 
-    grx::AnimKeySequence<sf::Vector2f> scale_keys;
+    grx::AnimKeySequence<core::vec2f> scale_keys;
     scale_keys.push_linear_to_bezier({1, 1}, 0, {0.47, 1.64});
     scale_keys.push_bezier({2, 2}, 0.5, {0.41, 0.8}, {0.47, 1.64});
     scale_keys.push_bezier_to_linear({1, 1}, 1, {0.41, 0.8});
 
-    grx::AnimKeySequence<sf::Vector2f> position_keys;
+    grx::AnimKeySequence<core::vec2f> position_keys;
     position_keys.push_linear_to_bezier({0, 0}, 0, {0.47, 1.64});
     position_keys.push_bezier({600, 400}, 0.5, {0.41, 0.8}, {0.47, 1.64});
     position_keys.push_bezier_to_linear({600, 200}, 1, {0.41, 0.8});

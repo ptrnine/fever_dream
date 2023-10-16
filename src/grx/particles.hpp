@@ -3,11 +3,13 @@
 #include <functional>
 #include <list>
 
-#include "scene.hpp"
-#include "../core/math.hpp"
+#include "core/math.hpp"
+#include "core/vec.hpp"
 #include "keyframe_animation.hpp"
+#include "scene.hpp"
 
-namespace grx {
+namespace grx
+{
 struct ParticleState {
     const Scene::Batch* batch;
     float timestep;
@@ -154,11 +156,11 @@ public:
         return time_elapsed >= duration;
     }
 
-    void move(const sf::Vector2f& movement) {
+    void move(const core::vec2f& movement) {
         batch->move(movement);
     }
 
-    void scale(const sf::Vector2f& scale) {
+    void scale(const core::vec2f& scale) {
         batch->scale(scale);
     }
 
@@ -187,10 +189,10 @@ public:
         effects.insert_or_assign(name, std::move(effect));
     }
 
-    bool play(const std::string&  name,
-              Scene::layer_t      layer,
-              const sf::Vector2f& position = {0, 0},
-              const sf::Vector2f& scale    = {1.f, 1.f}) {
+    bool play(const std::string& name,
+              Scene::layer_t     layer,
+              const core::vec2f& position = {0, 0},
+              const core::vec2f& scale    = {1.f, 1.f}) {
         auto found = effects.find(name);
         if (found == effects.end())
             return false;
@@ -219,13 +221,13 @@ private:
 };
 
 namespace particle {
-    inline auto position(const AnimKeySequence<sf::Vector2f>& keys) {
+    inline auto position(const AnimKeySequence<core::vec2f>& keys) {
         return [keys = keys](sf::Transformable& obj, const ParticleState& state) {
             obj.setPosition(keys.lookup(state.time_elapsed_coef));
         };
     }
 
-    inline auto scale(const AnimKeySequence<sf::Vector2f>& keys) {
+    inline auto scale(const AnimKeySequence<core::vec2f>& keys) {
         return [keys = keys](sf::Transformable& obj, const ParticleState& state) {
             obj.setScale(keys.lookup(state.time_elapsed_coef));
         };
@@ -237,7 +239,7 @@ namespace particle {
         };
     }
 
-    inline auto gravity(const std::vector<float>& masses = {}, const std::vector<sf::Vector2f>& velocities = {}) {
+    inline auto gravity(const std::vector<float>& masses = {}, const std::vector<core::vec2f>& velocities = {}) {
         return [masses = masses, velocities = velocities](sf::Transformable& obj, const ParticleState& state) mutable {
             auto idx = state.idx;
             auto& bodies = state.batch->get_elements();
@@ -247,14 +249,14 @@ namespace particle {
             if (bodies.size() > velocities.size())
                 velocities.resize(bodies.size(), {0, 0});
 
-            sf::Vector2f accel{0, 0};
+            core::vec2f accel{0, 0};
 
             for (size_t i = 0; i < bodies.size(); ++i) {
                 if (i == idx)
                     continue;
                 auto mass = masses[i];
                 auto pos = std::visit([](auto&& obj) { return obj.getPosition(); }, bodies[i]);
-                auto dir = core::normalize(pos - obj.getPosition());
+                auto dir = core::vec2f(pos - obj.getPosition()).normalize();
                 accel += dir * mass;
             }
 

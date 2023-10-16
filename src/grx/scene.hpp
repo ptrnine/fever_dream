@@ -8,6 +8,7 @@
 
 #include <SFML/Graphics/RenderTarget.hpp>
 
+#include "core/vec.hpp"
 #include "sfml_types.hpp"
 
 namespace grx {
@@ -57,17 +58,17 @@ public:
             return users;
         }
 
-        void move(const sf::Vector2f& movement) {
+        void move(const core::vec2f& movement) {
             transform.translate(movement);
         }
 
-        void scale(const sf::Vector2f& scale) {
+        void scale(const core::vec2f& scale) {
             /* TODO: optimize for 0 0 scale */
             transform.scale(scale, calc_center());
         }
 
-        sf::Vector2f calc_center() {
-            sf::Vector2f center{0, 0};
+        core::vec2f calc_center() {
+            core::vec2f center{0, 0};
             for (auto&& element : elements)
                 center +=
                     std::visit([](auto&& obj) { return obj.getPosition(); }, element) * (1.f / float(elements.size()));

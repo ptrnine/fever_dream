@@ -8,9 +8,9 @@
 #include "grx/particles.hpp"
 
 int main() {
-    sf::Vector2f     window_size{1800, 1000};
+    core::vec2u      window_size{1800, 1000};
     sf::RenderWindow wnd{
-        sf::VideoMode(window_size.x, window_size.y),
+        sf::VideoMode(window_size.x(), window_size.y()),
         "test window",
         sf::Style::Default,
         sf::ContextSettings{24, 8, 8},
@@ -29,7 +29,7 @@ int main() {
     grx::Particles effect;
     effect.set_duration(2);
 
-    std::vector<sf::Vector2f> velocities;
+    std::vector<core::vec2f> velocities;
     std::vector<float> masses;
 
     for (size_t i = 0; i < 12; ++i) {
@@ -39,13 +39,13 @@ int main() {
         auto x = std::cos(angle);
         auto y = std::sin(angle);
 
-        velocities.push_back(sf::Vector2f{-y, x} * 600.f);
+        velocities.push_back(core::vec2f{-y, x} * 600.f);
         masses.push_back(1.f);
 
         auto& think = effect.create_element(sf::CircleShape(50, 128));
         think.setTexture(&texture);
         think.setOrigin(50, 50);
-        think.setPosition(sf::Vector2f{x * 50, y * 50});
+        think.setPosition(core::vec2f{x * 50, y * 50});
     }
 
     auto& think = effect.create_element(sf::CircleShape(70, 128));

@@ -1,8 +1,5 @@
 #pragma once
-
 #include <cmath>
-
-#include <SFML/System/Vector2.hpp>
 
 
 namespace core {
@@ -28,18 +25,6 @@ inline auto cubic_bezier(auto x1, auto x2, auto p1_x, auto p1_y, auto p2_x, auto
 
 inline auto inverse_lerp(auto x1, auto x2, auto value) {
     return (value - x1) / (x2 - x1);
-}
-
-inline float magnitude2(const sf::Vector2f& vec) {
-    return vec.x * vec.x + vec.y * vec.y;
-}
-
-inline float magnitude(const sf::Vector2f& vec) {
-    return std::sqrt(magnitude2(vec));
-}
-
-inline sf::Vector2f normalize(const sf::Vector2f& vec) {
-    return vec / magnitude(vec);
 }
 
 namespace interpolation

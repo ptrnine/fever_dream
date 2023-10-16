@@ -9,9 +9,9 @@
 
 int main() {
     sf::ContextSettings context_settings{0, 0, 8, 4, 6};
-    sf::Vector2f        window_size{1800, 1000};
+    core::vec2u         window_size{1800, 1000};
     sf::RenderWindow    wnd(
-        sf::VideoMode(window_size.x, window_size.y), "test window", sf::Style::Default, context_settings);
+        sf::VideoMode(window_size.x(), window_size.y()), "test window", sf::Style::Default, context_settings);
     wnd.setActive();
     wnd.setVerticalSyncEnabled(false);
 
@@ -21,8 +21,8 @@ int main() {
 
     grx::Particles particles;
     particles.set_duration(grx::duration_endless);
-    for (float x = 100; x < window_size.x - 100; x += 24) {
-        for (float y = 100; y < window_size.y - 100; y += 24) {
+    for (float x = 100; x < window_size.x() - 100; x += 24) {
+        for (float y = 100; y < window_size.y() - 100; y += 24) {
             sf::CircleShape element{4};
             element.setFillColor(sf::Color::Yellow);
             element.setPosition(x, y);
