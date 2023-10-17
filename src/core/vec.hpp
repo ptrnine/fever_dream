@@ -1,8 +1,10 @@
 #pragma once
-#include <tuple>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
+#include <tuple>
+#include <string>
 
 #include "floating_point.hpp"
 #include "concepts.hpp"
@@ -10,6 +12,7 @@
 
 #include <SFML/System/Vector2.hpp>
 #include <SFML/System/Vector3.hpp>
+#include <SFML/Graphics/Color.hpp>
 
 namespace core
 {
@@ -273,14 +276,24 @@ struct vec_base {
 /*
  * Non-floating point specific
  */
-template <typename T, size_t S, template <typename, size_t> class DerivedT, typename Enable = void>
+template <typename T, size_t S, template <typename, size_t> class DerivedT>
 struct vec_specific : vec_base<T, S, DerivedT> {};
+
+/*
+ * Uint-8 specific (colors)
+ */
+template <template <typename, size_t> class DerivedT>
+struct vec_specific<uint8_t, 4, DerivedT> : vec_base<uint8_t, 4, DerivedT> {
+    operator sf::Color() const {
+        return {this->v[0], this->v[1], this->v[2], this->v[3]};
+    }
+};
 
 /*
  * Floating point specific
  */
-template <typename T, size_t S, template <typename, size_t> class DerivedT>
-struct vec_specific<T, S, DerivedT, std::enable_if_t<std::is_floating_point<T>::value>> : vec_base<T, S, DerivedT> {
+template <std::floating_point T, size_t S, template <typename, size_t> class DerivedT>
+struct vec_specific<T, S, DerivedT> : vec_base<T, S, DerivedT> {
     bool essentially_equal(const DerivedT<T, S>& vec, T epsilon) const {
         return vec_float_essentially_equal(this->v, vec.v, epsilon, std::make_index_sequence<S>());
     }
@@ -473,13 +486,16 @@ struct vec<T, 1> : public vec1_base<T, 1, vec> {
 template <typename T>
 struct vec<T, 2> : public vec2_base<T, 2, vec> {
     constexpr vec() = default;
-    constexpr vec(const std::array<T, 2>& a): vec2_base<T, 2, vec>{a} {}
+    explicit constexpr vec(const std::array<T, 2>& a): vec2_base<T, 2, vec>{a} {}
     constexpr vec(T x, T y): vec2_base<T, 2, vec>{x, y} {}
-    constexpr vec(const sf::Vector2<T>& sfml_vec): vec2_base<T, 2, vec>{sfml_vec.x, sfml_vec.y} {}
+    explicit constexpr vec(const sf::Vector2<T>& sfml_vec): vec2_base<T, 2, vec>{sfml_vec.x, sfml_vec.y} {}
+
+    constexpr vec& operator=(const sf::Vector2<T>& sfml_vec) {
+        this->xy(sfml_vec.x, sfml_vec.y);
+    }
 
     void set(T x, T y) {
-        this->x(x);
-        this->y(y);
+        this->xy(x, y);
     }
 
     DEF_SFML_OP(sf::Vector2, operator+, operator+=, +, +=)
@@ -491,18 +507,20 @@ struct vec<T, 2> : public vec2_base<T, 2, vec> {
 template <typename T>
 struct vec<T, 3> : public vec3_base<T, 3, vec> {
     constexpr vec() = default;
-    constexpr vec(const std::array<T, 3>& a): vec3_base<T, 3, vec>{a} {}
+    explicit constexpr vec(const std::array<T, 3>& a): vec3_base<T, 3, vec>{a} {}
     constexpr vec(T x, T y, T z): vec3_base<T, 3, vec>{x, y, z} {}
     constexpr vec(const vec<T, 2>& v, T z): vec{v.x(), v.y(), z} {}
     constexpr vec(T x, const vec<T, 2>& v): vec{x, v.x(), v.y()} {}
-    constexpr vec(const sf::Vector3<T>& sfml_vec): vec2_base<T, 3, vec>{sfml_vec.x, sfml_vec.y, sfml_vec.z} {}
+    explicit constexpr vec(const sf::Vector3<T>& sfml_vec): vec2_base<T, 3, vec>{sfml_vec.x, sfml_vec.y, sfml_vec.z} {}
     constexpr vec(T x, const sf::Vector2<T>& sfml_vec): vec2_base<T, 3, vec>{x, sfml_vec.x, sfml_vec.y} {}
     constexpr vec(const sf::Vector2<T>& sfml_vec, T z): vec2_base<T, 3, vec>{sfml_vec.x, sfml_vec.y, z} {}
 
+    constexpr vec& operator=(const sf::Vector3<T>& sfml_vec) {
+        this->set(sfml_vec.x, sfml_vec.y, sfml_vec.z);
+    }
+
     void set(T x, T y, T z) {
-        this->x(x);
-        this->y(y);
-        this->z(z);
+        this->xyz(x, y, z);
     }
 
     template <typename TT>
@@ -523,7 +541,7 @@ struct vec<T, 3> : public vec3_base<T, 3, vec> {
 template <typename T>
 struct vec<T, 4> : public vec4_base<T, 4, vec> {
     constexpr vec() = default;
-    constexpr vec(const std::array<T, 4>& a): vec4_base<T, 4, vec>{a} {}
+    explicit constexpr vec(const std::array<T, 4>& a): vec4_base<T, 4, vec>{a} {}
     constexpr vec(T x, T y, T z, T w): vec4_base<T, 4, vec>{x, y, z, w} {}
     constexpr vec(const vec<T, 2>& v, T z, T w): vec{v.x(), v.y(), z, w} {}
     constexpr vec(T x, const vec<T, 2>& v, T w): vec{x, v.x(), v.y(), w} {}
@@ -532,10 +550,63 @@ struct vec<T, 4> : public vec4_base<T, 4, vec> {
     constexpr vec(T x, const vec<T, 3>& v): vec{x, v.x(), v.y(), v.z()} {}
 
     void set(T x, T y, T z, T w) {
-        this->x(x);
-        this->y(y);
-        this->z(z);
-        this->w(w);
+        this->xyzw(x, y, z, w);
+    }
+};
+
+template <>
+struct vec<uint8_t, 4> : public vec4_base<uint8_t, 4, vec> {
+    using T         = uint8_t;
+    constexpr vec() = default;
+    explicit constexpr vec(const std::array<T, 4>& array): vec4_base<T, 4, vec>{array} {}
+    constexpr vec(T r, T g, T b, T a): vec4_base<T, 4, vec>{r, g, b, a} {}
+    constexpr vec(const vec<T, 2>& rg, T b, T a): vec{rg.r(), rg.g(), b, a} {}
+    constexpr vec(T r, const vec<T, 2>& gb, T a): vec{r, gb.x(), gb.y(), a} {}
+    constexpr vec(T r, T g, const vec<T, 2>& ba): vec{r, g, ba.x(), ba.y()} {}
+    constexpr vec(const vec<T, 3>& rgb, T a): vec{rgb.r(), rgb.g(), rgb.b(), a} {}
+    constexpr vec(T r, const vec<T, 3>& gba): vec{r, gba.x(), gba.y(), gba.z()} {}
+    explicit constexpr vec(const sf::Color& color): vec{color.r, color.g, color.b, color.a} {}
+    constexpr vec& operator=(const sf::Color& color) {
+        this->rgba(color.r, color.g, color.b, color.a);
+        return *this;
+    }
+
+    void set(T r, T g, T b, T a) {
+        this->rgba(r, g, b, a);
+    }
+
+    static vec from_str(const std::string& str_color) {
+        static constexpr int hexmap[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0, 0, 10, 11, 12, 13, 14, 15};
+
+        auto   p = str_color.data();
+        vec color{255, 255, 255, 255};
+
+        if (*p == '#') {
+            ++p;
+
+            for (int i = 0, v = toupper(*p); v && i < 8 && ((v >= '0' && v <= '9') || (v >= 'A' && v <= 'F')); ++i) {
+                auto digit = uint8_t(hexmap[v - '0']);
+                color.v[size_t(i) / 2] &= uint8_t(i % 2 ? (0xf0 | digit) : (0x0f | (digit << 4)));
+                ++p;
+                v = toupper(*p);
+            }
+        }
+
+        return color;
+    }
+
+    std::string to_str() const {
+        constexpr char hexmap[] = "0123456789abcdef";
+        std::string    result   = "#";
+        for (size_t i = 0; i < 3; ++i) {
+            result.push_back(hexmap[v[i] >> 4]);
+            result.push_back(hexmap[v[i] & 0xf]);
+        }
+        if (a() != 255) {
+            result.push_back(hexmap[a() >> 4]);
+            result.push_back(hexmap[a() & 0xf]);
+        }
+        return result;
     }
 };
 
@@ -582,6 +653,8 @@ using vec4i = vec4<int>;
 using vec4u = vec4<unsigned>;
 using vec4f = vec4<float>;
 using vec4d = vec4<double>;
+
+using rgba_t = vec4<uint8_t>;
 
 template <size_t N, typename T, size_t S>
 decltype(auto) get(const vec<T, S>& v) {
