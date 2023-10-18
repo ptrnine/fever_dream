@@ -8,6 +8,7 @@
 namespace grx
 {
 enum class interpolation_t { hold = 0, linear, bezier };
+inline constexpr interpolation_t interpolation_not_set{-1};
 
 template <typename T>
 struct anim_key {
@@ -21,8 +22,8 @@ struct anim_key {
 template <typename T>
 class anim_key_sequence {
 public:
-    void push(const anim_key<T>& key) {
-        keys.push_back(key);
+    void push(anim_key<T> key) {
+        keys.push_back(std::move(key));
     }
 
     void push_hold(const T& value, float time) {
