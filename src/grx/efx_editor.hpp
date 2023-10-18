@@ -204,7 +204,7 @@ private:
         build_result_t result;
 
         result.name = obj.at("name").get<std::string>();
-        float duration = obj.at("duration").get<float>();
+        result.effect.set_duration(obj.at("duration").get<float>());
 
         /*
          * Parse animations
