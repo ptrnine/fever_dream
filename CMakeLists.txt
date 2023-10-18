@@ -11,5 +11,10 @@ find_package(nlohmann_json 3.11 REQUIRED)
 
 set(LIBS sfml-window sfml-graphics GL nlohmann_json::nlohmann_json)
 
+option(ENABLE_ASAN "Enable address sanitizer" OFF)
+if(ENABLE_ASAN)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fsanitize=address")
+endif()
+
 add_subdirectory(src)
 add_subdirectory(examples)
