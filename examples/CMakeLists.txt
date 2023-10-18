@@ -1,7 +1,8 @@
 set(_examples
     efx_gravity
     efx_think
-    efx_keyframe_animations
+    efx_keyframe_animation
+    efx_json_effect
 )
 
 foreach(_example ${_examples})
