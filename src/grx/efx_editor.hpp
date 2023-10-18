@@ -200,6 +200,35 @@ private:
         }
     }
 
+    std::map<std::string, sf::Texture*> parse_textures(const object_t& obj) const {
+        std::map<std::string, sf::Texture*> textures;
+
+        if (obj.contains("textures")) {
+            for (auto&& [texture_name, texture_j] : obj.at("textures").get<object_t>()) {
+                auto tx_obj     = texture_j.get<object_t>();
+                auto path       = tx_obj.at("path").get<std::string>();
+                auto smooth_p   = tx_obj.find("smooth");
+                auto srgb_p     = tx_obj.find("srgb");
+                auto repeated_p = tx_obj.find("repeated");
+
+                bool smooth   = true;
+                bool srgb     = false;
+                bool repeated = false;
+
+                if (smooth_p != tx_obj.end())
+                    smooth = smooth_p->second.get<bool>();
+                if (srgb_p != tx_obj.end())
+                    srgb = srgb_p->second.get<bool>();
+                if (repeated_p != tx_obj.end())
+                    repeated = repeated_p->second.get<bool>();
+
+                textures.emplace(texture_name, &tx_mgr->load(path, smooth, srgb, repeated));
+            }
+        }
+
+        return textures;
+    }
+
     build_result_t build(const object_t& obj) const {
         build_result_t result;
 
@@ -247,27 +276,7 @@ private:
         /*
          * Parse textures
          */
-        std::map<std::string, sf::Texture*> textures;
-        for (auto&& [texture_name, texture_j] : obj.at("textures").get<object_t>()) {
-            auto tx_obj = texture_j.get<object_t>();
-            auto path = tx_obj.at("path").get<std::string>();
-            auto smooth_p = tx_obj.find("smooth");
-            auto srgb_p = tx_obj.find("srgb");
-            auto repeated_p = tx_obj.find("repeated");
-
-            bool smooth = true;
-            bool srgb = false;
-            bool repeated = false;
-
-            if (smooth_p != tx_obj.end())
-                smooth = smooth_p->second.get<bool>();
-            if (srgb_p != tx_obj.end())
-                srgb = srgb_p->second.get<bool>();
-            if (repeated_p != tx_obj.end())
-                repeated = repeated_p->second.get<bool>();
-
-            textures.emplace(texture_name, &tx_mgr->load(path, smooth, srgb, repeated));
-        }
+        auto textures = parse_textures(obj);
 
         /*
          * Parse templates
