@@ -35,6 +35,11 @@ public:
             affected_indices.assign(indices);
         }
 
+        void set_affected_indices(std::vector<index_t> indices) {
+            affects_all = false;
+            affected_indices = std::move(indices);
+        }
+
         void set_affects_all(bool value = true) {
             affects_all = value;
         }
@@ -108,6 +113,11 @@ public:
     T& create_element(T&& element) {
         elements.emplace_back(std::forward<T>(element));
         return std::get<std::decay_t<T>>(elements.back());
+    }
+
+    drawable_t& push_element(drawable_t element) {
+        elements.emplace_back(std::move(element));
+        return elements.back();
     }
 
 private:
