@@ -3,6 +3,7 @@ set(_examples
     efx_think
     efx_keyframe_animation
     efx_json_effect
+    ui_imgui_sfml_test
 )
 
 foreach(_example ${_examples})
