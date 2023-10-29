@@ -14,6 +14,9 @@
 #include <SFML/System/Vector3.hpp>
 #include <SFML/Graphics/Color.hpp>
 
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include <imgui.h>
+
 namespace core
 {
 /*
@@ -373,6 +376,10 @@ struct vec2_base : public vec1_base<T, S, DerivedT> {
         return {this->x(), this->y()};
     }
 
+    operator ImVec2() const {
+        return {this->x(), this->y()};
+    }
+
     GEN_GET_2_FROM_VEC2(x, y)
     GEN_SET_2_FROM_VEC2(x, y)
     GEN_GET_2_FROM_VEC2(r, g)
@@ -489,6 +496,7 @@ struct vec<T, 2> : public vec2_base<T, 2, vec> {
     explicit constexpr vec(const std::array<T, 2>& a): vec2_base<T, 2, vec>{a} {}
     constexpr vec(T x, T y): vec2_base<T, 2, vec>{x, y} {}
     explicit constexpr vec(const sf::Vector2<T>& sfml_vec): vec2_base<T, 2, vec>{sfml_vec.x, sfml_vec.y} {}
+    constexpr vec(const ImVec2& imgui_vec): vec2_base<T, 2, vec>{imgui_vec.x, imgui_vec.y} {}
 
     constexpr vec& operator=(const sf::Vector2<T>& sfml_vec) {
         this->xy(sfml_vec.x, sfml_vec.y);
@@ -688,6 +696,11 @@ template <math_vector T>
 constexpr inline auto abs(const T& n_dim_vector) {
     using value_t = typename T::value_type;
     return vec_map(n_dim_vector, [](value_t v) { return static_cast<value_t>(std::abs(v)); });
+}
+
+template <math_vector T>
+inline auto lerp(T v0, T v1, T t) {
+    return v0 * (T::filled_with(1.f) - t) + v1 * t;
 }
 } // namespace core
 
