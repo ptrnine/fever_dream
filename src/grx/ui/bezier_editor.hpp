@@ -13,9 +13,6 @@
 #include "core/math.hpp"
 #include "types.hpp"
 
-
-#include <iostream>
-
 namespace ui
 {
 namespace imgui = ImGui;
