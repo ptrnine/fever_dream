@@ -84,12 +84,7 @@ private:
         if (k2.interpolation == interpolation_t::hold)
             return k1.value;
 
-        auto t      = core::inverse_lerp(k1.time, k2.time, time);
-        auto inv_t  = 1.f - t;
-        auto t2     = t * t;
-        auto t3     = t2 * t;
-        auto inv_t2 = inv_t * inv_t;
-        auto inv_t3 = inv_t2 * inv_t;
+        auto t = core::inverse_lerp(k1.time, k2.time, time);
 
         unsigned f = (unsigned(k1.interpolation == interpolation_t::bezier) << 1) |
                      unsigned(k2.interpolation == interpolation_t::bezier);
