@@ -4,6 +4,7 @@ set(_examples
     efx_keyframe_animation
     efx_json_effect
     ui_imgui_sfml_test
+    ui_bezier_editor
 )
 
 foreach(_example ${_examples})
